@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    container_name: planova_backend
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=planova_db
+      - DB_USERNAME=planova_user
+      - DB_PASSWORD=planova_pass
+    networks:
+      - planova_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: planova_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - planova_network
+
+  db:
+    image: mysql:8.0
+    container_name: planova_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: planova_db
+      MYSQL_USER: planova_user
+      MYSQL_PASSWORD: planova_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "3306:3306"
+    networks:
+      - planova_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: planova_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - planova_network
+
+networks:
+  planova_network:
+    driver: bridge
