@@ -9,6 +9,13 @@ use Illuminate\Http\JsonResponse;
 
 class DivisionController extends Controller
 {
+use App\Models\Division;
+use App\Models\Event;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+
+class DivisionController extends Controller
+{
     public function index(): JsonResponse
     {
         $divisions = Division::with('budgetItems')->get();
@@ -22,6 +29,13 @@ class DivisionController extends Controller
             'name' => 'required|string|max:255',
             'budget_limit' => 'required|numeric|min:0',
         ]);
+
+        $event = Event::findOrFail($validated['event_id']);
+        $totalAllocated = $event->divisions()->sum('budget_limit');
+
+        if (($totalAllocated + $validated['budget_limit']) > $event->total_budget) {
+            return response()->json(['message' => 'Total budget limit exceeded!'], 422);
+        }
 
         $division = Division::create($validated);
         return response()->json($division, 201);

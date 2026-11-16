@@ -27,6 +27,18 @@ class EventController extends Controller
         return response()->json($event, 201);
     }
 
+    public function validateDivisionBudget(Request $request, $eventId): JsonResponse
+    {
+        $event = Event::with('divisions.budgetItems')->findOrFail($eventId);
+        $totalAllocated = $event->divisions->sum('budget_limit');
+        
+        return response()->json([
+            'total_budget' => $event->total_budget,
+            'total_allocated' => $totalAllocated,
+            'is_valid' => $totalAllocated <= $event->total_budget
+        ]);
+    }
+
     public function show(Event $event): JsonResponse
     {
         $event->load(['divisions.budgetItems', 'auditReports']);
@@ -49,5 +61,44 @@ class EventController extends Controller
     {
         $event->delete();
         return response()->json(null, 204);
+    }
+
+    public function summary(Request $request): JsonResponse
+    {
+        $eventId = $request->query('event_id');
+        if (!$eventId) {
+            return response()->json(['message' => 'event_id required'], 400);
+        }
+
+        $event = Event::with('divisions.budgetItems')->findOrFail($eventId);
+
+        $divisions = $event->divisions->map(function ($division) {
+            $items = $division->budgetItems;
+            $totalSpent = $items->sum(fn($item) => $item->quantity * $item->unit_price);
+            $usagePercent = $division->budget_limit > 0 ? round(($totalSpent / $division->budget_limit) * 100, 2) : 0;
+
+            return [
+                'id' => $division->id,
+                'name' => $division->name,
+                'budget_limit' => $division->budget_limit,
+                'total_spent' => $totalSpent,
+                'usage_percent' => $usagePercent,
+            ];
+        });
+
+        $totalBudget = $event->total_budget;
+        $totalSpent = $divisions->sum('total_spent');
+        $remainingBudget = $totalBudget - $totalSpent;
+
+        return response()->json([
+            'event' => [
+                'id' => $event->id,
+                'name' => $event->name,
+                'total_budget' => $totalBudget,
+                'total_spent' => $totalSpent,
+                'remaining_budget' => $remainingBudget,
+            ],
+            'divisions' => $divisions,
+        ]);
     }
 }

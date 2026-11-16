@@ -15,6 +15,13 @@ class BudgetItemController extends Controller
         return response()->json($items);
     }
 
+use App\Models\BudgetItem;
+use App\Models\Division;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+
+class BudgetItemController extends Controller
+{
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -25,6 +32,14 @@ class BudgetItemController extends Controller
             'vendor_name' => 'nullable|string|max:255',
             'status' => 'sometimes|in:Draft,Pending Audit,Approved',
         ]);
+
+        $division = Division::findOrFail($validated['division_id']);
+        $totalSpent = $division->budgetItems()->sum(\DB::raw('quantity * unit_price'));
+        $itemTotal = $validated['quantity'] * $validated['unit_price'];
+
+        if (($totalSpent + $itemTotal) > $division->budget_limit) {
+            return response()->json(['message' => 'Budget limit for this division exceeded!'], 422);
+        }
 
         $item = BudgetItem::create($validated);
         return response()->json($item, 201);

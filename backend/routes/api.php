@@ -11,4 +11,5 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('divisions', DivisionController::class);
     Route::apiResource('budget-items', BudgetItemController::class);
     Route::apiResource('audits', AuditController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::get('budget-summary', [EventController::class, 'summary']);
 });
